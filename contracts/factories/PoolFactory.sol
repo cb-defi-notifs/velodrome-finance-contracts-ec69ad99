@@ -13,7 +13,7 @@ contract PoolFactory is IPoolFactory {
 
     uint256 public stableFee;
     uint256 public volatileFee;
-    uint256 public constant MAX_FEE = 100; // 1%
+    uint256 public constant MAX_FEE = 300; // 3%
     // Override to indicate there is custom 0% fee - as a 0 value in the customFee mapping indicates
     // that no custom fee rate has been set
     uint256 public constant ZERO_FEE_INDICATOR = 420;
@@ -21,11 +21,6 @@ contract PoolFactory is IPoolFactory {
 
     /// @dev used to change the name/symbol of the pool by calling emergencyCouncil
     address public voter;
-
-    /// @dev used to enable Router conversion of v1 => v2 VEL0
-    address public velo;
-    address public veloV2;
-    address public sinkConverter;
 
     mapping(address => mapping(address => mapping(bool => address))) private _getPool;
     address[] public allPools;
@@ -41,7 +36,6 @@ contract PoolFactory is IPoolFactory {
         voter = msg.sender;
         pauser = msg.sender;
         feeManager = msg.sender;
-        sinkConverter = msg.sender;
         isPaused = false;
         stableFee = 5; // 0.05%
         volatileFee = 30; // 0.3%
@@ -63,17 +57,7 @@ contract PoolFactory is IPoolFactory {
     }
 
     /// @inheritdoc IPoolFactory
-    function getPair(address tokenA, address tokenB, bool stable) external view returns (address) {
-        return _getPool[tokenA][tokenB][stable];
-    }
-
-    /// @inheritdoc IPoolFactory
     function isPool(address pool) external view returns (bool) {
-        return _isPool[pool];
-    }
-
-    /// @inheritdoc IPoolFactory
-    function isPair(address pool) external view returns (bool) {
         return _isPool[pool];
     }
 
@@ -82,28 +66,6 @@ contract PoolFactory is IPoolFactory {
         if (msg.sender != voter) revert NotVoter();
         voter = _voter;
         emit SetVoter(_voter);
-    }
-
-    /// @inheritdoc IPoolFactory
-    function setSinkConverter(address _sinkConverter, address _velo, address _veloV2) external {
-        if (msg.sender != sinkConverter) revert NotSinkConverter();
-        sinkConverter = _sinkConverter;
-        velo = _velo;
-        veloV2 = _veloV2;
-
-        // Follow logic of createPool() - except add getPool values for both volatile
-        // and stable so there is no way to create an additional velo => veloV2 pool
-        (address token0, address token1) = _velo < _veloV2 ? (_velo, _veloV2) : (_veloV2, _velo);
-        _getPool[token0][token1][true] = sinkConverter;
-        _getPool[token1][token0][true] = sinkConverter;
-        _getPool[token0][token1][false] = sinkConverter;
-        _getPool[token1][token0][false] = sinkConverter;
-        allPools.push(sinkConverter);
-        _isPool[sinkConverter] = true;
-
-        // emit two events - for both the "stable" and "volatile" pool being created
-        emit PoolCreated(token0, token1, true, sinkConverter, allPools.length);
-        emit PoolCreated(token0, token1, false, sinkConverter, allPools.length);
     }
 
     function setPauser(address _pauser) external {
@@ -175,10 +137,5 @@ contract PoolFactory is IPoolFactory {
         allPools.push(pool);
         _isPool[pool] = true;
         emit PoolCreated(token0, token1, stable, pool, allPools.length);
-    }
-
-    /// @inheritdoc IPoolFactory
-    function createPair(address tokenA, address tokenB, bool stable) external returns (address pool) {
-        return createPool(tokenA, tokenB, stable);
     }
 }

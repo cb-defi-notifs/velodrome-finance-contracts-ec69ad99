@@ -29,11 +29,10 @@ contract PoolTest is BaseTest {
         escrow.setArtProxy(address(artProxy));
 
         distributor = new RewardsDistributor(address(escrow));
-        voter = new Voter(address(forwarder), address(escrow), address(factoryRegistry), address(vFactory));
+        voter = new Voter(address(forwarder), address(escrow), address(factoryRegistry));
         router = new Router(
             address(forwarder),
             address(factoryRegistry),
-            address(0),
             address(factory),
             address(voter),
             address(WETH)
@@ -804,6 +803,17 @@ contract PoolTest is BaseTest {
         vm.prank(address(owner2));
         vm.expectRevert(IPool.NotEmergencyCouncil.selector);
         pool.setName("Some new name");
+    }
+
+    function testCannotSyncPoolWithNoLiquidity() external {
+        deployPoolCoins();
+
+        address token1 = address(new ERC20("", ""));
+        address token2 = address(new ERC20("", ""));
+        address newPool = factory.createPool(token1, token2, true);
+
+        vm.expectRevert(IPool.InsufficientLiquidity.selector);
+        IPool(newPool).sync();
     }
 
     function testSetPoolSymbol() external {

@@ -5,7 +5,7 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {IERC6372} from "@openzeppelin/contracts/interfaces/IERC6372.sol";
 
 /**
- * @dev Taken from OpenZeppelin's IGovernor. Excludes `cancel`.
+ * @dev Taken from OpenZeppelin's IGovernor. Excludes `cancel` and `quorum`.
  */
 abstract contract IGovernor is IERC165, IERC6372 {
     enum ProposalState {
@@ -14,7 +14,7 @@ abstract contract IGovernor is IERC165, IERC6372 {
         Canceled,
         Defeated,
         Succeeded,
-        Queued,
+        Queued, // unused, required for backwards compatibility
         Expired,
         Executed
     }
@@ -43,6 +43,11 @@ abstract contract IGovernor is IERC165, IERC6372 {
      * @dev Emitted when a proposal is executed.
      */
     event ProposalExecuted(uint256 proposalId);
+
+    /**
+     * @dev Emitted when a comment is cast on a certain proposal.
+     */
+    event Comment(uint256 indexed proposalId, address indexed account, uint256 indexed tokenId, string comment);
 
     /**
      * @dev Emitted when a vote is cast without params.
@@ -177,15 +182,6 @@ abstract contract IGovernor is IERC165, IERC6372 {
     function votingPeriod() public view virtual returns (uint256);
 
     /**
-     * @notice module:user-config
-     * @dev Minimum number of cast voted required for a proposal to be successful.
-     *
-     * NOTE: The `timepoint` parameter corresponds to the snapshot used for counting vote. This allows to scale the
-     * quorum depending on values such as the totalSupply of a token at this timepoint (see {ERC20Votes}).
-     */
-    function quorum(uint256 timepoint) public view virtual returns (uint256);
-
-    /**
      * @notice module:reputation
      * @dev Voting power of an `tokenId` at a specific `timepoint`.
      *
@@ -239,6 +235,13 @@ abstract contract IGovernor is IERC165, IERC6372 {
         bytes[] memory calldatas,
         bytes32 descriptionHash
     ) public payable virtual returns (uint256 proposalId);
+
+    /**
+     * @dev Add a comment to a proposal
+     *
+     * Emits a {Comment} event.
+     */
+    function comment(uint256 proposalId, uint256 tokenId, string calldata message) external virtual;
 
     /**
      * @dev Cast a vote

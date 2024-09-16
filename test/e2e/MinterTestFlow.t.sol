@@ -107,9 +107,9 @@ contract MinterTestFlow is ExtendedBaseTest {
         skipToNextEpoch(1);
 
         minter.updatePeriod();
-        /// total velo supply ~954983290, tail emissions .3% of total supply
-        /// 954983290 ~= 50_000_000 initial supply + emissions until now
-        assertApproxEqAbs(VELO.balanceOf(address(voter)), 2_864_950 * TOKEN_1, TOKEN_1);
+        /// total velo supply ~1005457263, tail emissions ~= .29% of total supply
+        /// 1005457263 ~= 50_000_000 initial supply + emissions until now
+        assertApproxEqAbs(VELO.balanceOf(address(voter)), 3_000_697 * TOKEN_1, TOKEN_1);
         voter.distribute(0, voter.length());
 
         assertEq(minter.tailEmissionRate(), 30);
@@ -127,28 +127,28 @@ contract MinterTestFlow is ExtendedBaseTest {
 
         uint256 pid = epochGovernor.propose(1, targets, values, calldatas, description);
 
-        skipAndRoll(15 minutes); // epoch + 15 minutes + 1
+        skipAndRoll(1); // epoch + 1 + 1
         vm.expectRevert("GovernorSimple: vote not currently active");
         epochGovernor.castVote(pid, 1, 1);
-        skipAndRoll(1); // epoch + 15 minutes + 2
+        skipAndRoll(1); // epoch + 2 + 2
 
         /// expect 1 (for vote) to pass
         epochGovernor.castVote(pid, 1, 1);
         vm.prank(address(owner2));
         epochGovernor.castVote(pid, 2, 0);
 
-        skipAndRoll(1 weeks); // epoch + 15 minutes + 2
+        skipAndRoll(1 weeks); // epoch + 2 + 2
         epochGovernor.execute(targets, values, calldatas, keccak256(bytes(description)));
         assertEq(minter.tailEmissionRate(), 31);
 
         minter.updatePeriod();
-        /// total velo supply ~957848240, tail emissions .31% of total supply
-        assertApproxEqAbs(VELO.balanceOf(address(voter)), 2_969_329 * TOKEN_1, TOKEN_1);
+        /// total velo supply ~1008887347, tail emissions .30% of total supply
+        assertApproxEqAbs(VELO.balanceOf(address(voter)), 3_110_487 * TOKEN_1, TOKEN_1);
         voter.distribute(0, voter.length());
 
         description = Strings.toString(block.timestamp);
         pid = epochGovernor.propose(1, targets, values, calldatas, description);
-        skipAndRoll(15 minutes + 1); // epoch + 30 minutes + 3
+        skipAndRoll(2); // epoch + 2 + 2
 
         /// expect 2 (no change vote) to pass
         epochGovernor.castVote(pid, 1, 2);
@@ -160,13 +160,13 @@ contract MinterTestFlow is ExtendedBaseTest {
         string memory description2 = Strings.toString(block.timestamp);
         uint256 pid2 = epochGovernor.propose(1, targets, values, calldatas, description2);
 
-        skipAndRoll(30 minutes + 3); // epoch + 30 minutes + 3
+        skipAndRoll(5 minutes); // epoch + 5 minutes
         epochGovernor.execute(targets, values, calldatas, keccak256(bytes(description)));
         assertEq(minter.tailEmissionRate(), 31);
 
         minter.updatePeriod();
-        /// total velo supply ~960817569, tail emissions .31% of total supply
-        assertApproxEqAbs(VELO.balanceOf(address(voter)), 2_978_534 * TOKEN_1, TOKEN_1);
+        /// total velo supply ~1012328065, tail emissions .30% of total supply
+        assertApproxEqAbs(VELO.balanceOf(address(voter)), 3_120_612 * TOKEN_1, TOKEN_1);
         voter.distribute(0, voter.length());
 
         /// expect 0 (against vote) to pass
@@ -179,8 +179,8 @@ contract MinterTestFlow is ExtendedBaseTest {
         assertEq(minter.tailEmissionRate(), 30);
 
         minter.updatePeriod();
-        /// total velo supply ~963796104, tail emissions .30% of total supply
-        assertApproxEqAbs(VELO.balanceOf(address(voter)), 2_891_388 * TOKEN_1, TOKEN_1);
+        /// total velo supply ~1015678216, tail emissions .29% of total supply
+        assertApproxEqAbs(VELO.balanceOf(address(voter)), 3_029_777 * TOKEN_1, TOKEN_1);
         voter.distribute(0, voter.length());
     }
 

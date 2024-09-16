@@ -2,20 +2,15 @@
 
 Velodrome V2 is a partial rewrite and redesign of the Solidly architecture.
 
-Velodrome V2 will be operating in parallel with V1, this is necessary to not
-disrupt any existing operations and allow a smooth transition for existing
-protocol users.
-
 ## Definitions
 
 - VELO: The native token in the Velodrome ecosystem. It is emitted by the Minter and is an ERC-20 compliant token.
 - Epoch: An epoch is one week in length, beginning at Thursday midnight UTC time. After 4 years, the day of the week it resets on will shift. 
-- Pool: AMM constant-product implementation similar to Uniswap V2 liquidity pools.  Note that in Velodrome V1, "pools" were referred to as "pairs".
-
+- Pool: AMM constant-product implementation similar to Uniswap V2 liquidity pools.
 
 ## Protocol Upgradability
 
-Velodrome V2 is immutable, just like V1. To allow improving the protocol, V2
+Velodrome V2 is immutable. To allow improving the protocol, V2
 factories are all upgradable. This means we can release new versions of
 factories for our pools and gauges, and leave it up to the users to decide if
 they want to migrate their positions.
@@ -45,11 +40,16 @@ is not critical. This is mentioned as a courtesy to integrators that may depend
 
 Pool helper contract that stores pool trading fees to keep them separate from the liquidity pool. 
 
+### PoolFactory
+
+Responsible for pool creation and management. It facilitates creating and fetching liquidity pools for pairs of tokens, specifying whether they're stable or volatile. It additionally provides pool configuration using 3 roles:
+- Pauser: Switch the pool's pause state (enabling/disabling pool swaps)
+- FeeManager: Can set a custom fee per pool, with a maximum fee of 3%
+
 ### Router
 
 Standard UniswapV2-like Router interface. Supports multi-pool swaps, lp deposits 
-and withdrawals. All functions support both V1 / V2 pools EXCEPT `addLiquidity` and
- `removeLiquidity`. These support V2 pools only. Zapping support is provided for standard
+and withdrawals. Zapping support is provided for standard
  ERC20 tokens only (i.e. there is no support for fee-on-transfer tokens etc).
 
 In addition, the router also supports:
@@ -66,7 +66,7 @@ Registry of pool, gauge, bribe and managed rewards factories. Contains a default
 
 ### Velo
 
-Standard ERC20 token. Minting permissions granted to both Minter and Sink Manager.
+Standard ERC20 token. Minting permissions granted to Minter.
 
 ### VotingEscrow
 
@@ -108,19 +108,22 @@ All of these operations require ownership of the underlying NFT or tokens being 
 
 See `VOTINGESCROW.md` for a visual respresentation.
 
-In addition, Velodrome supports "managed NFTs" which aggregates NFT voting power whilst perpetually locking the underlying tokens. These NFTs function as a single NFT, with rewards accrued by the NFT going to the manager, who can then distribute (net of fees) to the depositors. These NFTs are permanently locked by default.
+In addition, Velodrome supports "managed NFTs" (also known as an "(m)veNFT") which aggregates NFT voting power whilst perpetually locking the underlying tokens. These NFTs function as a single NFT, with rewards accrued by the NFT going to the manager, who can then distribute (net of fees) to the depositors. These NFTs are permanently locked by default.
 - NFTs can exist in one of three states: normal, locked or managed. By default, they are in normal state.
 - Only governance or an allowed manager can create managed NFTs, special NFTs in the managed state.
 - Managed NFTs can be deactivated, a process which prevents the NFT from voting and from receiving deposits (requires emergency council).
 - An NFT can deposit into one managed NFT at a time, converting it from normal state to locked state. 
 - The deposited NFT can be withdrawn at any time, with its balance restored and locktime extended to the maximum (4 years). Any rebases collected by the manager will be distributed pro-rata to the user. 
+- For (m)veNFT implementations, refer to the official [repository](https://github.com/velodrome-finance/AutoCompounder).
 
 ### Minter
 
 The minting contract handles emissions for the Velodrome protocol. Emissions
 start at 15m per epoch, decaying at a rate of 1% per epoch. Rebases (which are
 sent to `RewardsDistributor`) are added on top of the base emissions to produce
-the total emission. 
+the total emission. An additional percentage of the total emission is then
+distributed to the `team`. This rate is initially set to 5% and can be
+further updated by the `team` itself.
 
 The minter has a modified emissions schedule that turns on once emissions fall
 below 6m per epoch (~92 epochs). After it turns on, weekly emissions will become
@@ -193,7 +196,8 @@ Standard Operations:
 - Can deposit LP tokens for another receipient. 
 - Can withdraw LP tokens. 
 - Can get emission rewards for an account. 
-- Can deposit emissions into gauge (requires `Voter`).
+- Can deposit emissions from Minter into Gauge (requires `Voter`).
+- Can deposit additional emissions into the Gauge (requires `team`).
 
 ### Reward
 
@@ -206,8 +210,7 @@ Voting rewards are rewards that accrue to users that vote for a specific pool. T
 ### FeesVotingReward
 
 The fee voting reward derives from the fees relinquished by LP depositors 
-depositing their LP token in to the gauge. Note that in V1, fees begin accruing
-immediately from when you vote for pool. In V2, fees are synchronized with bribes
+depositing their LP token in to the gauge. These fees are synchronized with bribes
 and accrue in the same way. Thus, fees that accrue during epoch `n` will be 
 distributed to voters of that pool in epoch `n+1`.
 
@@ -228,47 +231,6 @@ Locked rewards are VELO token rewards that have been compounded into the managed
 Free rewards are rewards that have been distributed to users depositing into a managed NFT. Any rewards earned by a managed NFT that a manager passes on will be distributed to the users that deposited into the managed NFT.
 
 
-## V2 Migration
-
-Velodrome V2 is designed to eventually replace the V1 token. To achieve that,
-V2 Minter was designed to respect the schedule of V1 and provide a solution to
-automatically convert the V1 emissions into V2 tokens. This is done by the Sink
-Manager, Facilitator, Drainer, and Converter.
-
-For existing LPs/stake the V2 gauges will be provided for V1 pools, allowing
-those users to switch to V2 by simply re-staking their LPs. Any new liquidity
-pools, will be using V2 Pool Factory after the V1 release.
-
-The V2 Router allows swaps between V1 and V2 pools. Swapping V1 tokens into any
-other tokens on V2 will automatically route through the right pools seamlessly.
-
-The V2 UI will allow converting an existing V1 veNFT into a V2 veNFT. The user
-will have to reset their V1 veNFT to allow the operation to succeed, but they
-can use the V2 veNFT right away.
-
-### Sink Manager
-
-The sink manager has helper functions that allow users to convert v1 assets to v2 assets. The sink manager also manages a veNFT which it uses to absorb and compound v1 VELO, ensuring that v1 emissions will be locked up over time.
-
-Users can:
-- Convert v1 VELO to v2 VELO.
-- Convert v1 NFTs to an equivalent v2 NFT (lock time will not be exactly the same, but rounded to the nearest week).
-
-v1 VELO that is converted will be added to the sink manager's veNFT, while v1 NFTs will be merged into the sink manager's ve NFT. Any v1 VELO captured via the `SinkConverter` will also be added to the sink manager's veNFT. Rebases and emissions will be compounded weekly to ensure emissions are captured.
-
-### Sink Manager Facilitator
-
-A lightweight contract created for every v1 NFT to v2 NFT conversion to facilitate the merge of the v1 NFT into the v1 NFT managed by the Sink Manager.
-
-### Sink Drain
-
-A "fake" pool used solely for the purpose of collecting gauge emissions from V1. LP tokens for the Sink Drain are minted only to the Sink Manager. 
-
-### Sink Converter
-
-A "fake" pool used to provide liquidity to routers for routes going from v1 VELO to any other token (via v2 pools). Any VELO captured in this way ends up in the `SinkDrain`.
-
-
 ## Governance
 
 ### VeloGovernor
@@ -278,6 +240,16 @@ timestamp based voting power from VotingEscrow NFTs. Includes support for vetoin
 proposals as mitigation against 51% attacks. `proposalHash` has also been modified to 
 include the `proposer` to prevent griefing attacks from proposal frontrunning. Votes
 are cast and counted on a per `tokenId` basis.
+
+The votes contract, which has `getPastVotes` has been modified to provide better support
+for managed veNFTs (mveNFTs). This is achieved by implementing the following features:
+- mveNFTs are unable to vote directly (i.e. calls to `castVote` will revert).
+- mveNFTs are able to vote indirectly by vote delegation.
+- locked nfts (i.e. nfts that deposited into a mveNFT) are able to vote if the mveNFT is not delegating.
+    - The voting balance of the locked nft is equal to its initial contribution + the 
+    proportion of all unclaimed locked rewards (both rebases and compounded rewards) + any balances delegated to it.
+    - Note that this uses a custom `earned` function as it requires the "lag" from rewards to be removed.
+- normal nfts can vote as normal
 
 ### EpochGovernor
 
@@ -299,3 +271,13 @@ Notable changes:
 - A proposal created in epoch `n` will be executable in epoch `n+1` once the proposal voting period has gone through.
 - Has three options (similar to Governor Bravo). The winner is selected based on which option has the most absolute votes at the end of the voting period. 
 - The proposer of a proposal cannot cancel the proposal.
+
+The votes contract, which has `getPastVotes` has been modified to provide better support
+for managed veNFTs (mveNFTs). This is achieved by implementing the following features:
+- mveNFTs are unable to vote directly (i.e. calls to `castVote` will revert).
+- mveNFTs are able to vote indirectly by vote delegation.
+- locked nfts (i.e. nfts that deposited into a mveNFT) are able to vote if the mveNFT is not delegating.
+    - The voting balance of the locked nft is equal to its initial contribution + the 
+    proportion of all unclaimed locked rewards (both rebases and compounded rewards) + any balances delegated to it.
+    - Note that this uses a custom `earned` function as it requires the "lag" from rewards to be removed.
+- normal nfts can vote as normal

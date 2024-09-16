@@ -81,24 +81,15 @@ Velodrome team
 #### Factory Registry Owner
 Velodrome team
 
-#### Sink Manager Owner
-Renounced after deployment
-
-
 ## Permissions List
 This is an exhaustive list of all admin permissions in Velodrome V2, sorted by the contract they are stored in.
 
 #### [PoolFactory](https://optimistic.etherscan.io/address/0xF1046053aa5682b4F9a81b5481394DA16BE5FF5a#code)
 - Pauser
     - Controls pause state of swaps on UniswapV2 pools created by this factory.  Users are still freely able to add/remove liquidity
-    - V1 pools will be pausable by the v1 factory.
     - Can set Pauser role
 - FeeManager
     - Controls default and custom fees for stable / volatile pools.
-
-#### [SinkManager](https://optimistic.etherscan.io/address/0x5aeE5F0E6C2055EbD776DB25F48f6c9A68ABcdaE#code)
-- Owner
-    - Used for set up only, renounced when deployment is completed.
 
 #### [FactoryRegistry](https://optimistic.etherscan.io/address/0xF4c67CdEAaB8360370F41514d06e32CcD8aA1d7B#code)
 - Owner
@@ -106,14 +97,24 @@ This is an exhaustive list of all admin permissions in Velodrome V2, sorted by t
     - This is used to add new pools, gauges or reward factory combinations. These new pools / gauges / rewards factories may have different code to existing implementations.
 
 #### [Minter](https://optimistic.etherscan.io/address/0x6dc9E1C04eE59ed3531d73a72256C0da46D10982#code)
+- Team
+    - Can set PendingTeam in Minter
+    - Can accept itself as team in Minter (requires being set as pendingTeam by previous team)
+    - Can set team rate in Minter
 - EpochGovernor
     - Can nudge the Minter to adjust the VELO emissions rate.
 
 #### [VeloGovernor](TODO: live etherscan link)
+- Team
+    - Can set proposal numerator.
 - Vetoer
     - Can set vetoer in VeloGovernor.
     - Can veto proposals.
     - Can renounce vetoer role.
+
+#### [Gauge](https://optimistic.etherscan.io/address/0xfc0b9a9c2b63e6acaca91a77a80bfa83c615e6c5#code)
+- Team
+    - Can deposit additional emissions into a gauge.
 
 #### [Voter](https://optimistic.etherscan.io/address/0x41C914ee0c7E1A5edCD0295623e6dC557B5aBf3C#code)
 - Governor
@@ -152,11 +153,6 @@ In addition to defined admin roles, various contracts within Velodrome protocol 
 #### [Minter](https://optimistic.etherscan.io/address/0x6dc9E1C04eE59ed3531d73a72256C0da46D10982#code)
 - Can mint VELO and distribute to Voter for gauge emissions and RewardsDistributor for claimable rebases
     - `Minter.updatePeriod()`
-
-#### [SinkManager](https://optimistic.etherscan.io/address/0x5aeE5F0E6C2055EbD776DB25F48f6c9A68ABcdaE#code)
-- Can mint v2 VELO from the conversion of v1 VELO or a v1 veNFT
-    - `SinkManager.convertVELO()`
-    - `SinkManager.convertVe()`
 
 #### [Voter](https://optimistic.etherscan.io/address/0x41C914ee0c7E1A5edCD0295623e6dC557B5aBf3C#code)
 - Can distribute VELO emissions to gauges

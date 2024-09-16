@@ -13,7 +13,8 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
-import "./IVetoGovernor.sol";
+import {IVetoGovernor} from "./IVetoGovernor.sol";
+import {IVotingEscrow} from "contracts/interfaces/IVotingEscrow.sol";
 
 /**
  * @dev Modified lightly from OpenZeppelin's Governor contract to support vetoing.
@@ -43,6 +44,9 @@ abstract contract VetoGovernor is Context, ERC165, EIP712, IVetoGovernor, IERC72
     // solhint-enable var-name-mixedcase
 
     string private _name;
+    uint256 public override commentWeighting = 4_000;
+    uint256 public constant override COMMENT_DENOMINATOR = 1_000_000_000;
+    IVotingEscrow public immutable override escrow;
 
     /// @custom:oz-retyped-from mapping(uint256 => Governor.ProposalCore)
     mapping(uint256 => ProposalCore) private _proposals;
@@ -76,8 +80,9 @@ abstract contract VetoGovernor is Context, ERC165, EIP712, IVetoGovernor, IERC72
     /**
      * @dev Sets the value for {name} and {version}
      */
-    constructor(string memory name_) EIP712(name_, version()) {
+    constructor(string memory name_, IVotingEscrow _ve) EIP712(name_, version()) {
         _name = name_;
+        escrow = _ve;
     }
 
     /**
@@ -209,13 +214,6 @@ abstract contract VetoGovernor is Context, ERC165, EIP712, IVetoGovernor, IERC72
     }
 
     /**
-     * @dev Address of the proposer
-     */
-    function _proposalProposer(uint256 proposalId) internal view virtual returns (address) {
-        return _proposals[proposalId].proposer;
-    }
-
-    /**
      * @dev Amount of votes already cast passes the threshold limit.
      */
     function _quorumReached(uint256 proposalId) internal view virtual returns (bool);
@@ -325,10 +323,7 @@ abstract contract VetoGovernor is Context, ERC165, EIP712, IVetoGovernor, IERC72
         uint256 proposalId = hashProposal(targets, values, calldatas, descriptionHash, proposer);
 
         ProposalState status = state(proposalId);
-        require(
-            status == ProposalState.Succeeded || status == ProposalState.Queued,
-            "Governor: proposal not successful"
-        );
+        require(status == ProposalState.Succeeded, "Governor: proposal not successful");
         _proposals[proposalId].executed = true;
 
         emit ProposalExecuted(proposalId);
@@ -413,7 +408,7 @@ abstract contract VetoGovernor is Context, ERC165, EIP712, IVetoGovernor, IERC72
 
     /**
      * @dev Internal veto mechanism: locks up the proposal timer, preventing it from being re-submitted. Marks it as
-     * veto to allow distinguishing it from executed and canceled proposals.
+     * vetoed to allow distinguishing it from executed and canceled proposals.
      *
      * Emits a {IVetoGovernor-ProposalVetoed} event.
      */
@@ -619,6 +614,26 @@ abstract contract VetoGovernor is Context, ERC165, EIP712, IVetoGovernor, IERC72
         }
 
         return weight;
+    }
+
+    /**
+     * @dev Comment mechanism for active or pending proposals. Requires a certain amount of votes. Emits a comment
+     *      containing the message.
+     *
+     * Emits a {IVetoGovernor-Comment} event.
+     */
+    function comment(uint256 proposalId, uint256 tokenId, string calldata message) external virtual override {
+        bytes memory params;
+        ProposalCore storage proposal = _proposals[proposalId];
+        ProposalState status = state(proposalId);
+        require(status == ProposalState.Active || status == ProposalState.Pending, "Governor: not active or pending");
+        uint256 startTime = proposal.voteStart;
+        address account = _msgSender();
+        uint256 weight = _getVotes(account, tokenId, startTime, params);
+        uint256 minimumWeight = (escrow.getPastTotalSupply(startTime) * commentWeighting) / COMMENT_DENOMINATOR;
+        require(weight > minimumWeight, "Governor: insufficient voting power");
+
+        emit Comment(proposalId, account, tokenId, message);
     }
 
     /**
